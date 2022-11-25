@@ -1,0 +1,11 @@
+.idea/*
+.DS_Store
+data/*
+api/*
+sistema/*
+ng/*
+data/
+api/
+sistema/
+ng/
+.devops/mysql/data.sql

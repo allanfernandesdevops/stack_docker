@@ -1,0 +1,120 @@
+version: '3'
+
+networks:
+  tecnolan:
+
+services:
+  api:
+    container_name: tec-api
+    build: .devops/web-server
+    volumes:
+      - ${STACK_HOME}/api:/var/www/html
+      - ~/.ssh:/root/.ssh # necessário para que o composer tenha acesso aos repositórios privados da tec
+    networks:
+      - tecnolan
+    depends_on:
+      - redis
+      - mysql
+      - localstack
+      - mailhog
+    links:
+      - redis
+      - mysql
+      - localstack
+      - mailhog
+    ports:
+      - 8081:80
+
+  sistema:
+    container_name: tec-sistema
+    build: .devops/web-server
+    volumes:
+      - ${STACK_HOME}/sistema/web:/var/www/html
+      - ${STACK_HOME}/ng/dist/ng:/var/www/html/ng
+      - ~/.ssh:/root/.ssh # necessário para que o composer tenha acesso aos repositórios privados da tec
+    networks:
+      - tecnolan
+    depends_on:
+      - api
+      - redis
+      - mysql
+      - localstack
+      - mailhog
+    links:
+      - redis
+      - mysql
+      - localstack
+      - mailhog
+    ports:
+      - 8082:80
+
+  ng:
+    container_name: tec-ng
+    build: .devops/ng
+    volumes:
+      - ${STACK_HOME}/ng:/var/www/html
+    networks:
+      - tecnolan
+
+  redis:
+    container_name: tec-redis
+    image: redis
+    command: redis-server
+    networks:
+      - tecnolan
+
+  mailhog:
+    container_name: tec-mailhog
+    image: mailhog/mailhog
+    networks:
+      - tecnolan
+    ports:
+      - "8025:8025"
+
+  mysql:
+    container_name: tec-mysql
+    image: mysql:5.6
+    volumes:
+    - ./data/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: root
+    ports:
+      - "3306:3306"
+    command: --sql-mode="STRICT_TRANS_TABLES,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+    networks:
+      - tecnolan
+
+  localstack:
+    container_name: tec-localstack
+    image: localstack/localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - EDGE_PORT=4566
+      - SERVICES=s3
+      - ${TEMPDIR:-/tmp/localstack}:/var/lib/localstack
+    volumes:
+      - "./data/localstack:/var/lib/localstack"
+    networks:
+      - tecnolan
+
+  proxy:
+    container_name: tec-proxy
+    build: .devops/proxy
+    volumes:
+      - .devops/proxy/crt:/etc/ssl/crt
+    networks:
+      - tecnolan
+    depends_on:
+      - api
+      - sistema
+      - ng
+    links:
+      - api
+      - sistema
+      - ng
+    ports:
+      - "80:80"
+      - "443:443"
